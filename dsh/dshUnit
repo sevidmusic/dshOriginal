@@ -1,0 +1,80 @@
+#!/bin/bash
+
+set -o posix
+
+currentDirectoryPath() {
+    local CURRENT_DIRECTORY
+    CURRENT_DIRECTORY="${BASH_SOURCE[0]}"
+    # Resolve symlynks
+    while [ -h "$CURRENT_DIRECTORY" ]; do
+      DIR="$(cd -P "$(dirname "$CURRENT_DIRECTORY")" >/dev/null 2>&1 && pwd)"
+      CURRENT_DIRECTORY="$(readlink "$CURRENT_DIRECTORY")"
+      [[ $CURRENT_DIRECTORY != /* ]] && CURRENT_DIRECTORY="$DIR/$CURRENT_DIRECTORY" # if $CURRENT_DIRECTORY was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+    done
+    printf "%s" "${CURRENT_DIRECTORY}"
+}
+
+setupPaths() {
+    PATH_TO_DSH_DIR="$(cd -P "$(dirname "$(currentDirectoryPath)")" >/dev/null 2>&1 && pwd)/"
+    PATH_TO_DSHUI="${PATH_TO_DSH_DIR}dshui.sh"
+    PATH_TO_DSH_FUNCTIONS="${PATH_TO_DSH_DIR}dshfunctions.sh"
+    PATH_TO_DSH_UNIT_ASSERTIONS="${PATH_TO_DSH_DIR}dshUnitAssertions.sh"
+    PATH_TO_DDMS="${PATH_TO_DSH_DIR/dsh\//}"
+    PATH_TO_DSHUNIT="${PATH_TO_DSH_DIR}dshUnit"
+    PATH_TO_DDMS_APP_DIR="${PATH_TO_DDMS}Apps/"
+}
+
+setupVars() {
+    TEST_FILE_NAME="${1}"
+    TEST_GROUP_NAME="${2}"
+    PASSES="${PASSES:-0}"
+    FAILS="${FAILS:-0}"
+}
+
+loadLibrary() {
+    [[ ! -f "${1}" ]] && printf "\n\n\e[33mError! Failed to load ${1}!\e[0m\n\n" && exit 1
+    . "${1}"
+}
+
+showTestsRunningLoadingBar() {
+    showLoadingBar "Running the ${HIGHLIGHTCOLOR}${2}${CLEAR_ALL_TEXT_STYLES} test file's ${HIGHLIGHTCOLOR}${1}${CLEAR_ALL_TEXT_STYLES} test group." 'dontClear'
+    [[ -n "${3}" ]] && notifyUser "    An app, ${HIGHLIGHTCOLOR}${3}${CLEAR_ALL_TEXT_STYLES} has been set up for testing." 0 'dontClear'
+}
+
+showTestTotals() {
+    notifyUser "${SUCCESSCOLOR}There were ${HIGHLIGHTCOLOR}${PASSES}${SUCCESSCOLOR} passing tests" 0 'dontClear'
+    notifyUser "${ERRORCOLOR}There were ${HIGHLIGHTCOLOR}${FAILS}${ERRORCOLOR} failing tests" 0 'dontClear'
+}
+
+runTestFileIfSpecified() {
+    if [[ -f "${PATH_TO_DSH_DIR}/dshUnitTests/${1}" ]]; then
+        clear
+        disableCtrlC
+        notifyUser "${HIGHLIGHTCOLOR}dsh Unit Tests will begin in a moment, please note, some tests may take awhile, and their output is hidden, the tests are running, please be patient and let this script complete." 0 'dontClear'
+        "${PATH_TO_DSH_DIR}/dshUnitTests/${1}" "${2}"
+        enableCtrlC
+    fi
+}
+
+devShowPaths() {
+    printf "\n%s\n" "${PATH_TO_DSH_DIR}"
+    printf "\n%s\n" "${PATH_TO_DSHUI}"
+    printf "\n%s\n" "${PATH_TO_DSH_FUNCTIONS}"
+    printf "\n%s\n" "${PATH_TO_DSH_UNIT_ASSERTIONS}"
+    printf "\n%s\n" "${PATH_TO_DDMS}"
+    printf "\n%s\n" "${PATH_TO_DSHUNIT}"
+    printf "\n%s\n" "${PATH_TO_DDMS_APP_DIR}"
+}
+
+setupPaths
+
+setupVars "${1}" "${2}"
+
+loadLibrary "${PATH_TO_DSH_FUNCTIONS}"
+
+loadLibrary "${PATH_TO_DSHUI}"
+
+loadLibrary "${PATH_TO_DSH_UNIT_ASSERTIONS}"
+
+runTestFileIfSpecified "${TEST_FILE_NAME}" "${TEST_GROUP_NAME}"
+
